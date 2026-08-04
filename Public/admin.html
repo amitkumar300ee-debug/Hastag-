@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trending Hub — Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0E1A1C; --panel:#122225; --edge:#1D3538;
+    --ink:#E8F1F0; --ink-dim:#7FA3A0; --amber:#FFB238;
+    --ok:#4ADE80; --err:#FF6B6B;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:'Inter',sans-serif; }
+  .wrap{ max-width:720px; margin:0 auto; padding:32px 18px 60px; }
+  h1{ font-family:'IBM Plex Mono',monospace; font-size:22px; margin:0 0 4px; }
+  .sub{ color:var(--ink-dim); font-size:13px; margin-bottom:24px; }
+  .card{
+    background:var(--panel); border:1px solid var(--edge); border-radius:10px;
+    padding:18px 20px; margin-bottom:16px;
+  }
+  .card h2{ font-family:'IBM Plex Mono',monospace; font-size:14px; letter-spacing:.04em; margin:0 0 12px; color:var(--amber); text-transform:uppercase; }
+  label{ font-size:12px; color:var(--ink-dim); display:block; margin-bottom:6px; }
+  input, textarea{
+    width:100%; background:#0B1416; border:1px solid var(--edge); color:var(--ink);
+    border-radius:6px; padding:10px 12px; font-family:'Inter',sans-serif; font-size:14px;
+    margin-bottom:12px;
+  }
+  textarea{ min-height:80px; resize:vertical; }
+  button{
+    background:var(--amber); color:#1A1200; border:none; border-radius:6px;
+    padding:10px 16px; font-weight:600; font-size:13px; cursor:pointer;
+  }
+  button.secondary{ background:transparent; border:1px solid var(--edge); color:var(--ink); }
+  button:disabled{ opacity:.5; cursor:not-allowed; }
+  .row{ display:flex; gap:10px; flex-wrap:wrap; }
+  .status{ font-family:'IBM Plex Mono',monospace; font-size:12px; margin-top:8px; min-height:16px; }
+  .status.ok{ color:var(--ok); } .status.err{ color:var(--err); }
+  #gate{ max-width:360px; margin:80px auto; text-align:center; }
+  #gate h1{ text-align:center; }
+  .hidden{ display:none; }
+  .note{ font-size:12px; color:var(--ink-dim); margin-top:6px; line-height:1.5; }
+</style>
+</head>
+<body>
+
+<div id="gate" class="wrap">
+  <h1>Trending Hub</h1>
+  <div class="sub">Admin login</div>
+  <div class="card">
+    <label for="keyInput">Admin key</label>
+    <input id="keyInput" type="password" placeholder="Enter admin key">
+    <button onclick="login()">Log in</button>
+    <div class="status" id="loginStatus"></div>
+  </div>
+</div>
+
+<div id="panelArea" class="wrap hidden">
+  <h1>Trending Hub — Admin</h1>
+  <div class="sub">Manual entries save instantly. YouTube refreshes itself every 6h — use the button below only if you want it sooner.</div>
+
+  <div class="card">
+    <h2>YouTube (automatic)</h2>
+    <p class="note">Pulled from the official YouTube Data API on a schedule. This button forces an immediate re-fetch.</p>
+    <button onclick="refreshYoutube()">Refresh YouTube now</button>
+    <div class="status" id="ytStatus"></div>
+  </div>
+
+  <div class="card">
+    <h2>Instagram — manual</h2>
+    <label>Hashtags (comma separated, most trending first)</label>
+    <textarea id="igManual" placeholder="#reels, #trending, #explorepage"></textarea>
+    <div class="row">
+      <button onclick="saveManual('instagram')">Save manual list</button>
+      <button class="secondary" onclick="runScraper('instagram')">Try scraper API</button>
+    </div>
+    <div class="status" id="igStatus"></div>
+    <p class="note">There's no official Instagram trending-hashtags API — "Try scraper API" only works once you've added a scraper's key in the worker secrets (RAPIDAPI_KEY / RAPIDAPI_HOST). It can break or stop working since it isn't officially supported by Meta.</p>
+  </div>
+
+  <div class="card">
+    <h2>Facebook — manual</h2>
+    <label>Hashtags (comma separated, most trending first)</label>
+    <textarea id="fbManual" placeholder="#viral, #news, #trending"></textarea>
+    <div class="row">
+      <button onclick="saveManual('facebook')">Save manual list</button>
+      <button class="secondary" onclick="runScraper('facebook')">Try scraper API</button>
+    </div>
+    <div class="status" id="fbStatus"></div>
+  </div>
+</div>
+
+<script>
+function getKey(){ return sessionStorage.getItem('adminKey'); }
+
+async function login(){
+  const key = document.getElementById('keyInput').value.trim();
+  const statusEl = document.getElementById('loginStatus');
+  if(!key){ statusEl.textContent = 'Enter a key.'; statusEl.className='status err'; return; }
+  try{
+    const res = await fetch('/api/admin/login', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({key})
+    });
+    const j = await res.json();
+    if(j.ok){
+      sessionStorage.setItem('adminKey', key);
+      document.getElementById('gate').classList.add('hidden');
+      document.getElementById('panelArea').classList.remove('hidden');
+    } else {
+      statusEl.textContent = 'Wrong key.'; statusEl.className = 'status err';
+    }
+  } catch(e){
+    statusEl.textContent = 'Could not reach server.'; statusEl.className = 'status err';
+  }
+}
+
+async function adminPost(path, body){
+  const res = await fetch(path, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', 'X-Admin-Key': getKey() },
+    body: JSON.stringify(body || {})
+  });
+  return res.json();
+}
+
+async function saveManual(platform){
+  const el = document.getElementById(platform === 'instagram' ? 'igManual' : 'fbManual');
+  const statusEl = document.getElementById(platform === 'instagram' ? 'igStatus' : 'fbStatus');
+  const tags = el.value.split(',').map(t => t.trim()).filter(Boolean);
+  if(tags.length === 0){ statusEl.textContent = 'Add at least one hashtag.'; statusEl.className='status err'; return; }
+  statusEl.textContent = 'Saving…'; statusEl.className = 'status';
+  const j = await adminPost('/api/admin/manual', { platform, tags });
+  statusEl.textContent = j.ok ? 'Saved.' : ('Error: ' + j.error);
+  statusEl.className = j.ok ? 'status ok' : 'status err';
+}
+
+async function runScraper(platform){
+  const statusEl = document.getElementById(platform === 'instagram' ? 'igStatus' : 'fbStatus');
+  statusEl.textContent = 'Calling scraper API…'; statusEl.className='status';
+  const j = await adminPost('/api/admin/scrape', { platform });
+  statusEl.textContent = j.ok ? ('Fetched ' + j.tags.length + ' tags.') : ('Error: ' + j.error);
+  statusEl.className = j.ok ? 'status ok' : 'status err';
+}
+
+async function refreshYoutube(){
+  const statusEl = document.getElementById('ytStatus');
+  statusEl.textContent = 'Refreshing…'; statusEl.className='status';
+  const j = await adminPost('/api/admin/refresh-youtube', {});
+  statusEl.textContent = j.ok ? 'Done.' : ('Error: ' + j.error);
+  statusEl.className = j.ok ? 'status ok' : 'status err';
+}
+
+// auto-restore session
+if(getKey()){
+  document.getElementById('gate').classList.add('hidden');
+  document.getElementById('panelArea').classList.remove('hidden');
+}
+</script>
+</body>
+</html>
