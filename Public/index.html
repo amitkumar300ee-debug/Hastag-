@@ -109,10 +109,21 @@
   .pill-tag.hidden-extra{ display:none; }
 
   .view-more{
-    background:none; border:none; cursor:pointer; margin-top:16px;
+    background:none; border:none; cursor:pointer;
     font-size:13.5px; font-weight:600; font-family:'Poppins',sans-serif;
   }
   .ig .view-more{ color:var(--ig); } .yt .view-more{ color:var(--yt); } .fb .view-more{ color:var(--fb); }
+
+  .card-actions{
+    display:flex; align-items:center; justify-content:center; gap:16px; margin-top:16px;
+  }
+  .copy-all{
+    background:rgba(255,255,255,.05); border:1px solid var(--edge); color:var(--ink-dim);
+    border-radius:7px; padding:7px 13px; font-size:12.5px; font-weight:500;
+    font-family:'Inter',sans-serif; cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+  }
+  .copy-all:hover{ color:var(--ink); border-color:rgba(255,255,255,.25); }
+  .copy-all.copied{ color:#4ADE80; border-color:#4ADE80; }
 
   .demo-note{ font-size:11px; color:var(--ink-dim); margin-top:10px; font-style:italic; }
 
@@ -148,7 +159,7 @@
     <a href="#youtube-card">YouTube</a>
     <a href="#facebook-card">Facebook</a>
   </div>
-  <a class="cta" href="/admin">Admin Panel</a>
+  <span class="cta">🔴 Live</span>
 </nav>
 
 <header class="hero" id="top">
@@ -167,7 +178,10 @@
     <p class="desc">Top trending Instagram hashtags to increase your reach and grow followers.</p>
     <div class="pills" id="pills-instagram"></div>
     <div class="demo-note hidden-extra" id="demo-note-instagram">Sample preview — live tags appear once the site is deployed.</div>
-    <button class="view-more" data-platform="instagram">View More Instagram Tags →</button>
+    <div class="card-actions">
+      <button class="view-more" data-platform="instagram">View More Instagram Tags →</button>
+      <button class="copy-all" data-platform="instagram">📋 Copy All</button>
+    </div>
   </section>
 
   <section class="card yt" id="youtube-card">
@@ -179,7 +193,10 @@
     <p class="desc">Top trending YouTube hashtags to rank your videos and get more views.</p>
     <div class="pills" id="pills-youtube"></div>
     <div class="demo-note hidden-extra" id="demo-note-youtube">Sample preview — live tags appear once the site is deployed.</div>
-    <button class="view-more" data-platform="youtube">View More YouTube Tags →</button>
+    <div class="card-actions">
+      <button class="view-more" data-platform="youtube">View More YouTube Tags →</button>
+      <button class="copy-all" data-platform="youtube">📋 Copy All</button>
+    </div>
   </section>
 
   <section class="card fb" id="facebook-card">
@@ -189,7 +206,10 @@
     <p class="desc">Top trending Facebook hashtags to boost your content reach and engagement.</p>
     <div class="pills" id="pills-facebook"></div>
     <div class="demo-note hidden-extra" id="demo-note-facebook">Sample preview — live tags appear once the site is deployed.</div>
-    <button class="view-more" data-platform="facebook">View More Facebook Tags →</button>
+    <div class="card-actions">
+      <button class="view-more" data-platform="facebook">View More Facebook Tags →</button>
+      <button class="copy-all" data-platform="facebook">📋 Copy All</button>
+    </div>
   </section>
 </main>
 
@@ -205,9 +225,9 @@
     <p>Instagram, YouTube and Facebook trends together in one place.</p>
   </div>
   <div class="feature">
-    <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg></div>
-    <h4>Admin Curated</h4>
-    <p>Instagram &amp; Facebook lists are reviewed manually for accuracy.</p>
+    <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="M9 12l2 2 4-4"/></svg></div>
+    <h4>Verified Tags</h4>
+    <p>Every hashtag is checked for relevance and quality before it goes live.</p>
   </div>
   <div class="feature">
     <div class="fi"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div>
@@ -246,6 +266,30 @@ document.querySelectorAll('.view-more').forEach(btn=>{
     const p = btn.dataset.platform;
     expanded[p] = !expanded[p];
     renderPills(p);
+  });
+});
+
+function copyText(text){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    return navigator.clipboard.writeText(text);
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  document.execCommand('copy');
+  document.body.removeChild(ta);
+  return Promise.resolve();
+}
+
+document.querySelectorAll('.copy-all').forEach(btn=>{
+  btn.addEventListener('click', async ()=>{
+    const p = btn.dataset.platform;
+    const text = state[p].join(' ');
+    await copyText(text);
+    const original = btn.textContent;
+    btn.textContent = '✅ Copied!';
+    btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent = original; btn.classList.remove('copied'); }, 1500);
   });
 });
 
